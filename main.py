@@ -9,6 +9,8 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 import string
 
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 
 
 #constantes 
@@ -66,14 +68,34 @@ class ProcesamientoDeTexto:
         text= re.sub(r'[•■♦➢➤]', ' ', text)
         return text.strip()
 
+    #se pueden colocar constraints de longitud del PDF
+    def getText(self,path):
+        text=[]
+        with fitz.open(path) as doc:
+            for page in doc:
+                text.append(page.get_text("text"))
+        return "\n".join(text)
+    
+    def getText2(self, path, start=0, end=None):
+        text = []
+        with fitz.open(path) as doc:
+            if end is None or end > len(doc):
+                end = len(doc)
+            for page_num in range(start, end):
+                page = doc.load_page(page_num)
+                text.append(page.get_text("text"))
+        return "\n".join(text)
+
+        
+                
+#se está haciendo un prototipado rápido
 
 
 
 
 #Acciones principales
 prueba = ProcesamientoDeTexto()
-doc = fitz.open("ejemplo.pdf")
+#doc = fitz.open("ejemplo.pdf")
 #print(doc.get_page_text(0))
-text=prueba.preprocess(doc.get_page_text(0))
+text=prueba.getText("ejemplo.pdf")
 print(text)
-doc.close()
