@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stack>
 using namespace std;
 void suma(char num1[], char num2[])
 {
@@ -77,6 +78,23 @@ void multiplicacion(char num1[],char num2[]){
     
 }
 
+void polaca(char num[],int size){
+    stack<char> resultado;
+    stack<char> auxiliar;
+    char aux;
+    for(int i=0;i<size;i++){
+        aux = num[i];
+        if(aux>='0' && aux<='9'){
+            resultado.push(aux);
+        }
+        else{
+            auxiliar.push(aux);
+        }
+    }
+    //se terminó de llenar las pilas
+    while(auxiliar )
+}
+
 int main(void){
     
     char a[5]={'1','0','0','0','5'};
@@ -84,6 +102,9 @@ int main(void){
 
     resta2(a,b);
 }
+
+
+
 
 
 //funciones para sumar con arreglos

@@ -1,3 +1,4 @@
+#modificado por: Manuel Fernández Mercado ID:254485
 import random
 from pyeasyga import pyeasyga
 
@@ -75,7 +76,9 @@ class CuadradoMagico:
   # -- Constructor
   def __init__(self,n):
     self.nombre = 'Cuadrado mágico 3x3'
+    self.n=n
     self.tamano=n*n
+    self.suma_objetivo = n*(n*n+1)//2
     self.individuo = list(range(1,self.tamano +1 ))
     self.nroIndividuos = 300
 
@@ -88,36 +91,50 @@ class CuadradoMagico:
   
   # -- Definir la función de aptitud del algoritmo genético
   def FnAptitud(self, individuo, individuoPatron):
-    # -- Inicializar lista de sumas
-    sumas = [0 for i in range(0, 8)]
-     # -- Filas
-    sumas[0] = individuo[0] + individuo[1] + individuo[2] # -- Fila 1
-    sumas[1] = individuo[3] + individuo[4] + individuo[5] # -- Fila 2
-    sumas[2] = individuo[6] + individuo[7] + individuo[8] # -- Fila 3
+    
+    n=self.n
+    suma_objetivo= self.suma_objetivo
+    #lista de sumas
+    sumas = []
+        # -- Sumar filas
+    for i in range(n):
+        fila_sum = sum(individuo[i*n:(i+1)*n])
+        sumas.append(fila_sum)
+    
+    # -- Sumar columnas
+    for j in range(n):
+        columna_sum = sum(individuo[j::n])
+        sumas.append(columna_sum)
+    
+    # -- Sumar diagonal principal
+    diag_principal = sum(individuo[i*n + i] for i in range(n))
+    sumas.append(diag_principal)
+    
+    # -- Sumar diagonal secundaria
+    diag_secundaria = sum(individuo[i*n + (n-1-i)] for i in range(n))
+    sumas.append(diag_secundaria)
 
-    # -- Columnas
-    sumas[3] = individuo[0] + individuo[3] + individuo[6] # -- Columna 1
-    sumas[4] = individuo[1] + individuo[4] + individuo[7] # -- Columna 2
-    sumas[5] = individuo[2] + individuo[5] + individuo[8] # -- Columna 3
-
-    # -- Diagonales
-    sumas[6] = individuo[0] + individuo[4] + individuo[8] # -- Diagonal 1
-    sumas[7] = individuo[2] + individuo[4] + individuo[6] # -- Diagonal 2
-
-    # -- Determinar cuántas sumas son diferentes de 15. Es óptimo cuando todas las sumas son 15
-    return len([s for s in sumas if s != 15])
+    # -- Determinar cuántas sumas son diferentes a la objetivo. Es óptimo cuando todas las sumas son iguales a la objetivo
+    return len([s for s in sumas if s != suma_objetivo])
+  
+  
   # -- Mostrar mejor solución
   def MostrarSolucion(self, solucion):
     valores = list(solucion[1])
-    for i in range(0, len(valores)):
-      if (i % 3 == 0):
-        print('\n')
-      print(valores[i], ' ', end="")
+    n = self.n
+    
+    print(f"\nCuadrado mágico {n}x{n} (Suma objetivo: {self.suma_objetivo})")
+    print("=" * (n * 4))
+    
+    for i in range(n):
+        for j in range(n):
+            print(f"{valores[i*n + j]:3}", end=" ")
+        print()
 
   # -- Ejecutar algoritmo genético
   def Ejecutar(self):
     # -- Crear objeto de problema de alogritmo Genético
-    pga = ProblemaAG('Cuadrado Mágico 3x3',self.individuo,self.nroIndividuos,self.FnAptitud)
+    pga = ProblemaAG('Cuadrado Mágico nxn',self.individuo,self.nroIndividuos,self.FnAptitud)
     # -- Ejecutar problema de algoritmo genético
     mejorIndividuo = pga.Ejecutar()
     # -- Mostrar el mejor resultado
@@ -131,5 +148,6 @@ class CuadradoMagico:
       
 
 #ejecución principal
-pcm = CuadradoMagico()
+#se puede cambiar para que sean más que 3, con 4 o más tarda un poco en dar el resultado
+pcm = CuadradoMagico(3)
 pcm.Ejecutar()
