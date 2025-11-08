@@ -1,6 +1,7 @@
-#Este archivo ejecuta el servidor que procesará las solicitudes de la web
-#podrá ser ejecutado en localhost o en una computadora diferente
-#el cliente manda PDF y/o mensajes al backend y este responde con JSON .
+#This file will execute the server
+#for dev use: uvicorn server:app --reload
+#CORS allows this server to catch request from local networks and localhost
+
 
 #Retos: -> Tener memoria (actualizarla y restaurarla)
 #       -> Arquitectura que minimice la generación de texto
@@ -11,25 +12,25 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import fitz  # PyMuPDF para leer PDFs
+from routes import router #separate routes from the server
 
-app = FastAPI() #creación del servidor
-#CORSMiddleware(app)  # Permite que una página web externa acceda a la API
+app = FastAPI() #server creation
+app.include_router(router) #routes from a separate file
 
+origins = [
+    "http://localhost.tiangolo.com",
+    "https://localhost.tiangolo.com",
+    "http://localhost",
+    "http://localhost:8080",
+]
 
-
-@app.get("/")
-async def index():
-    return {"mensaje": "index page1"}
-
-
-
-#para mandar Queries
-
-
-
-#esta
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 
