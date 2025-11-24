@@ -3,4 +3,5 @@ ejemplo.pdf
 __pycache__/
 .vscode/
 output/
+chromaDB/
 
