@@ -49,7 +49,6 @@ CREATE TABLE messages(
     fk_chat_id INT NOT NULL,
     content TEXT,
     sent_date TIMESTAMP
-
 );
 --Auxiliar table
 
