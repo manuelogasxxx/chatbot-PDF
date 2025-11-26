@@ -44,7 +44,7 @@ vectorstore = FAISS.from_documents(docs,embed_model)
 
 retriever = vectorstore.as_retriever(search_kwargs={'k':3})
 
-query = "¿existen modelos matematicos?"
+query = "Algorithm"
 
 # 2. Usa el retriever para obtener solo los documentos más relevantes
 #    El método get_relevant_documents devuelve una lista de objetos Document

@@ -67,7 +67,7 @@ qa = RetrievalQA.from_chain_type(
 
 
 # 6. Consultar
-query = "¿De que habla el modelo propuesto?"
+query = "¿qué algoritmos se mencionan en este artículo?"
 
 result = qa.invoke({"query": query})
 
