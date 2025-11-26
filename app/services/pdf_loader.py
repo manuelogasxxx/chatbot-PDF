@@ -1,4 +1,10 @@
-#this file contains the code for 
+"""
+This file contains the code for load text from a PDF trying to emulate
+langchain text extractor.
+Next changes:
+    *PymuPDF4LLM for extract tables and images in markdown
+    *OCRTESSERACT for scanned PDFs
+"""
 import fitz #pymuPDF
 import re
 #this function cleans text using basic regex
@@ -28,6 +34,7 @@ def get_text_from_pdf(route):
             clean_content = raw_content#clean_text(raw_content)
             
             if clean_content:
+                #this metadate may change for better seek functions in the embedding part
                 metadata ={
                     "source": route,
                     "page": i,
@@ -44,7 +51,7 @@ def get_text_from_pdf(route):
         print(f"Error al procesar el archivo: {e}")
         return []
             
-#verificion
+#verification
 ruta = "ejemplo.pdf"
 data_pdf=get_text_from_pdf(ruta)
 if data_pdf:
@@ -54,4 +61,3 @@ if data_pdf:
 else:
     print("No se encontraron datos o el PDF está vacío/es una imagen escaneada.")
 
-#The file conversion is quicl

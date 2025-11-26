@@ -158,12 +158,9 @@ def _split_recursivo(texto: str, chunk_size: int, chunk_overlap: int) -> List[st
         
     return chunks
 
-#return a List of dictionaries, each one contains a chunk and its metadata
-def make_chunks(documents: List[Dict], chunk_size: int = 1000, chunk_overlap: int = 200) -> List[Dict]:
-    """
-    Recibe la lista de páginas y devuelve una lista de fragmentos (chunks)
-    manteniendo los metadatos originales.
-    """
+#return a List of dictionaries, each one contains a document page and its metadata
+#return a List[Dict]
+def create_chunks(documents: List[Dict], chunk_size: int = 1000, chunk_overlap: int = 200) -> List[Dict]:
     all_chunks = []
     
     for doc in documents:
@@ -172,8 +169,8 @@ def make_chunks(documents: List[Dict], chunk_size: int = 1000, chunk_overlap: in
         for fragment in diveded_text:
             all_chunks.append({
                 "page_content": fragment,
-                "metadata": doc['metadata'] # Copiamos metadatos de la página origen
+                "metadata": doc['metadata'] # Insert metadata's page in each chunk
             })
             
-    print(f"✅ Chunking completed: {len(all_chunks)} fragment generated.")
+    print(f"✅ Chunking completed: {len(all_chunks)} chunks generated.")
     return all_chunks

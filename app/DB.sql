@@ -36,7 +36,8 @@ CREATE TABLE chats_documents(
     fk_chat_id INT NOT NULL,
     fk_document_id INT NOT NULL,
     PRIMARY KEY (fk_chat_id,fk_document_id), 
-    FOREIGN KEY (fk_chat_id) REFERENCES chats(chat_id)
+    FOREIGN KEY (fk_chat_id) REFERENCES chats(chat_id),
+    FOREIGN KEY (fk_document_id) REFERENCES chats(chat_id)
 );
 
 CREATE TABLE types(

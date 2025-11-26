@@ -5,17 +5,10 @@ import chromaDB
 #load the embedder model, this coulb be change anytime
 embedder = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-def embed_chunks(chunks):
-    return [embedder.embed(doc)[0] for doc in chunks]
 
 
 
-#finally each embedding is stored in chroma
-
-def generar_embeddings(chunks: List[Dict]) -> List[Dict]:
-    """
-    Enriquece los chunks usando FastEmbed (ligero, rápido, sin PyTorch pesado).
-    """
+def create_embeddings(chunks: List[Dict]) -> List[Dict]:
     #print(f"⚙️ Cargando modelo FastEmbed: {model_name}...")
     
     # 1. Inicialización del modelo
