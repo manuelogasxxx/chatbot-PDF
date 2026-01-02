@@ -6,13 +6,26 @@ from app.services.pdf_loader import get_text_from_pdf_pymupdf4llm
 from app.services.chunker import create_chunks
 from app.services.embedder import create_embeddings
 from app.services.chroma import save_in_chroma
+from app.db.session import SessionLocal
+from app.db.models import Chat
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
 router = APIRouter()
+
+#DB conection
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 #custom DIR, make it if doesnt exist
 UPLOAD_DIR = "uploads/pdfs"
 os.makedirs(UPLOAD_DIR,exist_ok=True)
 
-#Api routes
+#Api routes (somo connections depends on db)
 @router.get("/")
 async def index():
     return {"mensaje": "index page1"}
@@ -38,3 +51,11 @@ async def create_upload_file(file: UploadFile = File(...)):
     coleccion = save_in_chroma(embed)
     
     return {"status":"ok","saved_as":file_path}
+
+@router.post("/chats")
+def create_chat(title: str, db: Session = Depends(get_db)):
+    chat = Chat(title=title, fk_user_id=1)
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
+    return chat

@@ -14,9 +14,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import router #separate routes from the server
 from app.database import Base,engine
+from app.db.init_db import init_db
 app = FastAPI() #server creation
 app.include_router(router) #routes from a separate file
-Base.metadata.create_all(bind=engine)
+#initialize db connection
+init_db()
+#Base.metadata.create_all(bind=engine)
 
 origins = [
     "http://localhost.tiangolo.com",
