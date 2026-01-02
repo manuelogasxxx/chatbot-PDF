@@ -1,5 +1,5 @@
 #This file will execute the server
-#for dev use: uvicorn server:app --reload
+#for dev use: uvicorn app.server:app --reload
 #CORS allows this server to catch request from local networks and localhost
 
 

@@ -2,7 +2,10 @@
 import os #manage filesystem
 from fastapi import APIRouter, File, UploadFile
 from app.models import Query #Class models for the API
-
+from app.services.pdf_loader import get_text_from_pdf_pymupdf4llm
+from app.services.chunker import create_chunks
+from app.services.embedder import create_embeddings
+from app.services.chroma import save_in_chroma
 router = APIRouter()
 
 #custom DIR, make it if doesnt exist
@@ -29,4 +32,9 @@ async def create_upload_file(file: UploadFile = File(...)):
     with open(file_path,"wb") as f:
         f.write(await file.read())
     #doesnt handle errors (check that)
+    pages = get_text_from_pdf_pymupdf4llm("uploads/pdfs/"+file.filename)
+    chunks = create_chunks(pages,1000,200)
+    embed = create_embeddings(chunks)
+    coleccion = save_in_chroma(embed)
+    
     return {"status":"ok","saved_as":file_path}

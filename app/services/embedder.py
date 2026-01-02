@@ -1,6 +1,6 @@
 from typing import List, Dict
 from fastembed import TextEmbedding
-import chromaDB
+import chromadb
 
 #load the embedder model, this coulb be change anytime
 embedder = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
@@ -53,8 +53,21 @@ def create_embeddings(chunks: List[Dict]) -> List[Dict]:
 
     return datos_vectorizados
 
+def load_collection(path_db="chromaDB", collection_name="myDocuments"):
+    client = chromadb.PersistentClient(path=path_db)
+    collection = client.get_collection(name=collection_name)
+    return collection
 #this function embedd a query and its part of the main RAG
 #collection correspond to the return value of chroma.py function
-def search_relevant(query: str,collection,k:int=3):
-    #by defualt 3 chunks are returned, this value may change 
-    return
+def buscar_similares(archivo,collection, texto_consulta, embedding_model, k=5):
+    # FastEmbeddings → generator → list
+    query_embedding = next(embedding_model.embed(texto_consulta))
+
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=k,
+        where={"source": archivo}
+    )
+
+    return results
+
