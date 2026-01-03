@@ -73,8 +73,10 @@ class Chat(Base):
     messages = relationship(
         "Message",
         back_populates="chat",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        order_by="Message.sent_date"
     )
+
 
     documents = relationship(
         "Document",

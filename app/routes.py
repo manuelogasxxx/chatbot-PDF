@@ -1,14 +1,15 @@
 #this file contais http urls for the API
 import os #manage filesystem
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, File, UploadFile,HTTPException
 from app.models import Query #Class models for the API
 from app.services.pdf_loader import get_text_from_pdf_pymupdf4llm
 from app.services.chunker import create_chunks
 from app.services.embedder import create_embeddings
 from app.services.chroma import save_in_chroma
 from app.db.session import SessionLocal
-from app.db.models import Chat
+from app.db.models import Chat,Message
 from fastapi import APIRouter, Depends
+from app.db.schemas.chats import (ChatCreate,ChatResponse,MessageCreate,MessageResponse)
 from sqlalchemy.orm import Session
 
 router = APIRouter()
@@ -18,8 +19,13 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+        db.commit()   # 👈 commit aquí
+    except:
+        db.rollback()
+        raise
     finally:
         db.close()
+
 
 #custom DIR, make it if doesnt exist
 UPLOAD_DIR = "uploads/pdfs"
@@ -52,10 +58,73 @@ async def create_upload_file(file: UploadFile = File(...)):
     
     return {"status":"ok","saved_as":file_path}
 
-@router.post("/chats")
-def create_chat(title: str, db: Session = Depends(get_db)):
-    chat = Chat(title=title, fk_user_id=1)
+#crud chats
+#@router.post("/chats")
+@router.post("/chats", response_model=ChatResponse)
+def create_chat(chat_data: ChatCreate, db: Session = Depends(get_db)):
+    chat = Chat(
+        title=chat_data.title,
+        fk_user_id=chat_data.user_id
+    )
     db.add(chat)
-    db.commit()
+    db.flush()      # fuerza error FK aquí
     db.refresh(chat)
     return chat
+
+@router.delete("/chats/{chat_id}", status_code=204)
+def delete_chat(chat_id: int, db: Session = Depends(get_db)):
+    chat = db.get(Chat, chat_id)
+
+    if not chat:
+        raise HTTPException(
+            status_code=404,
+            detail="Chat no encontrado"
+        )
+
+    db.delete(chat)
+    return
+
+
+#CRUD Mensajes
+from fastapi import HTTPException
+
+@router.post("/messages", response_model=MessageResponse)
+def create_message(
+    message_data: MessageCreate,
+    db: Session = Depends(get_db)
+):
+    chat = db.get(Chat, message_data.chat_id)
+    if not chat:
+        raise HTTPException(
+            status_code=404,
+            detail="Chat no existe"
+        )
+
+    message = Message(
+        fk_chat_id=message_data.chat_id,
+        role=message_data.role,
+        content=message_data.content
+    )
+
+    db.add(message)
+    db.flush()
+    db.refresh(message)
+    return message
+
+
+from typing import List
+
+@router.get(
+    "/chats/{chat_id}/messages",
+    response_model=List[MessageResponse]
+)
+def get_chat_messages(chat_id: int, db: Session = Depends(get_db)):
+    chat = db.get(Chat, chat_id)
+
+    if not chat:
+        raise HTTPException(
+            status_code=404,
+            detail="Chat no encontrado"
+        )
+
+    return chat.messages
