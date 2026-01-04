@@ -4,3 +4,10 @@ from pydantic import BaseModel
 
 class Query(BaseModel):
     mensaje: str
+    
+    
+
+
+class UserRegister(BaseModel):
+    username: str
+    password: str

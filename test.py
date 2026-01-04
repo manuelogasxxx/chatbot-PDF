@@ -13,18 +13,17 @@ pages = get_text_from_pdf("uploads/pdfs/ejemplo.pdf")
 chunks = create_chunks(pages,1000,200)
 embed = create_embeddings(chunks)
 coleccion = save_in_chroma(embed)
-#The search is not done yet
-# 1. Cargar colección
+
 collection = load_collection(
     path_db="chromaDB",
     collection_name="myDocuments"
 )
 
-# 2. Texto de consulta
+
 query = "¿de que trata el documento?"
 
 nombre = "ejemplo.pdf"
-# 3. Buscar
+
 results = buscar_similares(
     nombre,
     collection=collection,
@@ -33,7 +32,6 @@ results = buscar_similares(
     k=3
 )
 
-# 4. Mostrar resultados
 for i, doc in enumerate(results["documents"][0]):
     print(f"\n🔹 Resultado {i+1}")
     print(doc)

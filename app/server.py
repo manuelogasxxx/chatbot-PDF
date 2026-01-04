@@ -13,7 +13,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import router #separate routes from the server
-from app.database import Base,engine
+#from app.database import Base,engine
 from app.db.init_db import init_db
 from sqlalchemy.exc import IntegrityError, OperationalError
 from app.core.exception_handlers import (

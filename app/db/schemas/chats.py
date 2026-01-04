@@ -38,3 +38,26 @@ class MessageResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+
+
+# --------- ENTRADA ---------
+
+class DocumentCreate(BaseModel):
+    file_name: str
+    file_route: str
+    user_id: int
+
+
+# --------- RESPUESTA ---------
+
+class DocumentResponse(BaseModel):
+    document_id: int
+    file_name: str
+    file_route: str
+    fk_user_id: int
+    load_date: datetime
+
+    class Config:
+        from_attributes = True

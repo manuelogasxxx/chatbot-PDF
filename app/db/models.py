@@ -23,6 +23,8 @@ class User(Base):
     username: Mapped[str] = mapped_column(
         String(16), unique=True, nullable=False
     )
+    
+    password: Mapped[str] = mapped_column(Text, nullable=False)
 
     register_date: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
@@ -167,5 +169,11 @@ class Message(Base):
     )
 
     chat = relationship("Chat", back_populates="messages")
+
+from pydantic import BaseModel
+
+class UserRegister(BaseModel):
+    username: str
+    password: str
 
 
