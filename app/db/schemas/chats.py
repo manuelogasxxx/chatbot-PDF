@@ -6,7 +6,7 @@ from typing import List, Optional,Literal
 
 class ChatCreate(BaseModel):
     title: str = Field(..., min_length=1)
-    user_id: int
+    #user_id: int
 
 
 # --------- RESPUESTA ---------
