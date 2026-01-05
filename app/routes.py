@@ -1,5 +1,7 @@
 #this file contais http urls for the API
-import os #manage filesystem
+from datetime import datetime
+import os
+import uuid #manage filesystem
 from fastapi import APIRouter, File, UploadFile,HTTPException
 from app.models import Query #Class models for the API
 from app.services.pdf_loader import get_text_from_pdf_pymupdf4llm
@@ -9,11 +11,11 @@ from app.services.chroma import save_in_chroma
 from app.db.session import SessionLocal
 from app.database import get_db
 from app.core.dependencies import get_current_user
-from app.db.models import Chat,Message,User,UserRegister
+from app.db.models import Chat,Message,User,UserRegister,Document,chats_documents
 from fastapi import APIRouter, Depends
 from app.db.schemas.chats import (ChatCreate,ChatResponse,MessageCreate,MessageResponse,DocumentCreate,DocumentResponse)
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List,Optional
 from app.core.security import create_access_token,verify_password,hash_password
 from fastapi.security import OAuth2PasswordRequestForm
 router = APIRouter()
@@ -103,6 +105,143 @@ async def create_upload_file(file: UploadFile = File(...)):
     
     return {"status":"ok","saved_as":file_path}
 
+
+@router.post("/upload-pdf")
+async def upload_pdf(
+    file: UploadFile = File(...),
+    chat_id: Optional[int] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Sube un PDF, procesa su contenido y lo registra en la base de datos.
+    Retorna solo datos simples que pueden ser serializados a JSON.
+    """
+    
+    # 1. Validar que sea un PDF
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(
+            status_code=400,
+            detail="Solo se permiten archivos PDF"
+        )
+    
+    # 2. Generar nombre único
+    unique_filename = f"{uuid.uuid4().hex}_{file.filename}"
+    file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    
+    try:
+        # 3. Guardar archivo
+        with open(file_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+        
+        # 4. Procesar PDF
+        pages = get_text_from_pdf_pymupdf4llm(file_path)
+        chunks = create_chunks(pages, 1000, 200)
+        embed = create_embeddings(chunks)
+        collection = save_in_chroma(embed)
+        
+        collection_id = (
+            collection.name
+            if hasattr(collection, "name")
+            else str(collection)
+        )
+        # 5. Crear registro en Document
+        document = Document(
+            file_name=file.filename,
+            file_route=file_path,
+            fk_user_id=current_user.user_id,
+            load_date=datetime.utcnow()
+        )
+        
+        db.add(document)
+        db.flush()
+        
+        # 6. Manejar chat
+        final_chat_id = None
+        final_chat_title = None
+        
+        if chat_id:
+            # Verificar que el chat exista y pertenezca al usuario
+            chat = db.get(Chat, chat_id)
+            if not chat:
+                raise HTTPException(404, "Chat no encontrado")
+            
+            if chat.fk_user_id != current_user.user_id:
+                raise HTTPException(403, "No tienes permiso para este chat")
+            
+            final_chat_id = chat_id
+            final_chat_title = chat.title
+            
+            # Asociar documento al chat
+            db.execute(
+                chats_documents.insert().values(
+                    fk_chat_id=chat_id,
+                    fk_document_id=document.document_id
+                )
+            )
+        else:
+            # Crear un nuevo chat
+            chat = Chat(
+                fk_user_id=current_user.user_id,
+                title=f"Chat sobre {file.filename}",
+                creation_date=datetime.utcnow()
+            )
+            
+            db.add(chat)
+            db.flush()
+            final_chat_id = chat.chat_id
+            final_chat_title = chat.title
+            
+            # Asociar documento al chat recién creado
+            db.execute(
+                chats_documents.insert().values(
+                    fk_chat_id=chat.chat_id,
+                    fk_document_id=document.document_id
+                )
+            )
+        
+        db.commit()
+        
+        # 7. Retornar solo datos simples (NO objetos SQLAlchemy)
+        return {
+            "status": "success",
+            "message": "PDF procesado y guardado exitosamente",
+            "data": {
+                "document": {
+                    "id": document.document_id,
+                    "name": document.file_name,
+                    "path": document.file_route,
+                    "uploaded_at": document.load_date.isoformat(),
+                    "user_id": document.fk_user_id
+                },
+                "chat": {
+                    "id": final_chat_id,
+                    "title": final_chat_title
+                } if final_chat_id else None,
+                "processing": {
+                    "pages": len(pages),
+                    "chunks": len(chunks),
+                    "collection_id": collection_id,
+                    "embedding_dimension": 384
+                }
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Limpiar archivo si hay error
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except:
+                pass
+        
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error procesando el PDF: {str(e)}"
+        )
 #crud chats
 #@router.post("/chats")
 @router.post("/chats", response_model=ChatResponse)
