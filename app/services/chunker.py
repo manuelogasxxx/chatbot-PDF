@@ -160,6 +160,7 @@ def _split_recursivo(texto: str, chunk_size: int, chunk_overlap: int) -> List[st
 
 #return a List of dictionaries, each one contains a document page and its metadata
 #return a List[Dict]
+
 def create_chunks(documents: List[Dict], chunk_size: int = 1000, chunk_overlap: int = 200) -> List[Dict]:
     all_chunks = []
     

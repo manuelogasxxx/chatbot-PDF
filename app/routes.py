@@ -1,12 +1,13 @@
 #this file contais http urls for the API
 from datetime import datetime
 import os
+import shutil
 import uuid #manage filesystem
-from fastapi import APIRouter, File, UploadFile,HTTPException
-from app.models import Query #Class models for the API
-from app.services.pdf_loader import get_text_from_pdf_pymupdf4llm
+from fastapi import APIRouter, File, Form, UploadFile,HTTPException
+from app.models import Query,QueryRequest #Class models for the API
+from app.services.pdf_loader import get_text_from_pdf_pymupdf4llm,extract_tables_from_page  
 from app.services.chunker import create_chunks
-from app.services.embedder import create_embeddings
+from app.services.embedder import create_embeddings,load_collection,buscar_similares
 from app.services.chroma import save_in_chroma
 from app.db.session import SessionLocal
 from app.database import get_db
@@ -18,6 +19,11 @@ from sqlalchemy.orm import Session
 from typing import List,Optional
 from app.core.security import create_access_token,verify_password,hash_password
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.exc import SQLAlchemyError
+from fastembed import TextEmbedding
+from langchain_ollama import OllamaLLM
+embedder = TextEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+llm = OllamaLLM(model="phi3")
 router = APIRouter()
 '''
 #DB conection
@@ -104,6 +110,175 @@ async def create_upload_file(file: UploadFile = File(...)):
     coleccion = save_in_chroma(embed)
     
     return {"status":"ok","saved_as":file_path}
+
+#ruta para la prueba
+@router.post("/upload_pdf_indexed")
+async def upload_pdf_indexed(
+    user_id: int = Form(...),  # Necesario porque Document requiere fk_user_id
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    # 1. Validar que el usuario existe (Opcional, pero recomendado)
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # 2. Guardar el archivo físico
+    # Recomendación: Usar UUID para evitar colisiones de nombres si dos usuarios suben "archivo.pdf"
+    unique_filename = f"{uuid.uuid4()}_{file.filename}"
+    file_path = os.path.join(UPLOAD_DIR, unique_filename)
+    
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error guardando archivo: {str(e)}")
+
+    # 3. Crear registro en Base de Datos para obtener el ID
+    new_doc = Document(
+        file_name=file.filename, # Nombre original para mostrar al usuario
+        file_route=file_path,    # Ruta física real
+        fk_user_id=user_id
+    )
+
+    try:
+        db.add(new_doc)
+        db.commit()
+        db.refresh(new_doc) # ¡Importante! Esto recupera el document_id generado
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Error al guardar en base de datos")
+
+    # 4. Procesamiento RAG (Simulado con tus funciones)
+    try:
+        #procesado del archivo
+        pages = get_text_from_pdf_pymupdf4llm(file_path,new_doc.document_id)
+        chunks = create_chunks(pages,1000,200)
+        embed = create_embeddings(chunks)
+        save_in_chroma(embed)
+        
+    except Exception as e:
+        # Si falla el proceso de IA, ¿deberíamos borrar el registro de la DB?
+        # Por ahora solo lanzamos error
+        raise HTTPException(status_code=500, detail=f"Error procesando IA: {str(e)}")
+
+    # 5. Retornar el ID a Streamlit
+    return {
+        "status": "ok", 
+        "document_id": new_doc.document_id,
+        "filename": new_doc.file_name
+    }
+
+#para las queryes personalizadas
+@router.post("/process_query")
+async def process_query(request: QueryRequest, db: Session = Depends(get_db)):
+    
+    # 1. Recuperar la ruta del archivo desde la DB
+    doc_record = db.query(Document).filter(Document.document_id == request.document_id).first()
+    if not doc_record:
+        raise HTTPException(404, "Documento no encontrado")
+        
+    file_path = doc_record.file_route
+
+    # --- ESTRATEGIA 1: EXTRACCIÓN DE TABLAS ---
+    if request.query_mode == "tables":
+        if not request.page_number:
+            return {"error": "Se requiere número de página para tablas."}
+            
+        # Obtenemos el Markdown crudo de esa página
+        md_content = extract_tables_from_page(file_path, request.page_number)
+        
+        # Opcional: Pasar este MD por una LLM para que limpie y deje SOLO las tablas
+        # prompt = f"Extrae solo las tablas de este markdown:\n\n{md_content}"
+        # response = llm.invoke(prompt)
+        
+        return {
+            "response": md_content, # Streamlit renderizará esto como tabla bonita
+            "source_page": request.page_number,
+            "mode": "tables"
+        }
+
+    # --- ESTRATEGIA 2: TRADUCCIÓN ---
+    elif request.query_mode == "translation":
+        if not request.text_input:
+            return {"error": "Se requiere texto para traducir."}
+            
+        # 1. Definimos un prompt estricto para que solo traduzca
+        prompt = f"""
+        Actúa como un traductor profesional y directo.
+        Tu única tarea es traducir el texto proporcionado.
+        
+        INSTRUCCIONES:
+        - Si el texto está en ESPAÑOL -> Tradúcelo al INGLÉS.
+        - Si el texto está en INGLÉS (u otro idioma) -> Tradúcelo al ESPAÑOL.
+        - NO expliques nada. NO digas "Aquí está la traducción". Solo devuelve el texto traducido.
+        
+        TEXTO A TRADUCIR:
+        {request.text_input}
+        """
+        
+        try:
+            # 2. Invocamos a Ollama
+            translated_text = llm.invoke(prompt)
+            
+            # Limpieza básica por si el modelo es muy hablador
+            translated_text = translated_text.strip('"').strip()
+
+            return {
+                "response": translated_text,
+                "mode": "translation"
+            }
+        except Exception as e:
+            return {"error": f"Error comunicando con Ollama: {str(e)}"}
+
+    # --- ESTRATEGIA 3: BÚSQUEDA SEMÁNTICA (RAG) ---
+    elif request.query_mode == "semantic":
+        # 1. Embedding y Búsqueda en Chroma
+        collection = load_collection(
+            path_db="chromaDB",
+            collection_name="myDocuments"
+        )
+
+        results = buscar_similares(
+            request.document_id,
+            collection=collection,
+            texto_consulta=request.text_input,
+            embedding_model=embedder,
+            k=3
+        )
+        docs_list = results['documents'][0]
+        metas_list = results['metadatas'][0]
+        
+        # 2. Estructuramos los chunks para el frontend
+        retrieved_chunks = []
+        context_str = ""
+
+        for i, text in enumerate(docs_list):
+            page = metas_list[i].get("page", 1)
+            
+            # Limpiamos el texto para la visualización
+            clean_text = text.replace("\n", " ").strip()
+            
+            # Preparamos el objeto para el frontend
+            retrieved_chunks.append({
+                "id": i + 1,
+                "text": clean_text,
+                "page": page,
+                # Tomamos las primeras 6 palabras para el resaltado del PDF
+                "highlight_sig": " ".join(clean_text.split()[:6])
+            })
+            print("DEBUG METADATAS:", results['metadatas'][0])
+            context_str += f"\nFragmento {i+1}: {text}\n"
+
+        # 3. Generamos la respuesta con la LLM
+        # answer = llm_chain.invoke(context_str, request.text_input)
+        answer = "Aquí tienes la información basada en los fragmentos encontrados..."
+
+        return {
+            "response": answer,
+            "chunks": retrieved_chunks, # <--- ENVIAMOS LA LISTA COMPLETA
+            "mode": "semantic"
+        }
 
 
 @router.post("/upload-pdf")

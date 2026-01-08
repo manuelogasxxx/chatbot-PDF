@@ -66,7 +66,8 @@ def buscar_similares(archivo,collection, texto_consulta, embedding_model, k=5):
     results = collection.query(
         query_embeddings=[query_embedding],
         n_results=k,
-        where={"source": archivo}
+        #where={"source": archivo}
+        where={"document_id": archivo}
     )
 
     return results

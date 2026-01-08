@@ -55,52 +55,76 @@ def get_text_from_pdf(route):
         print(f"Error al procesar el archivo: {e}")
         return []
 
-def get_text_from_pdf_pymupdf4llm(route):
+def get_text_from_pdf_pymupdf4llm(route, document_id):
     doc = None
     try:
-        # 1. Abrimos el documento primero con fitz (PyMuPDF)
+        # 1. Abrir documento
         doc = fitz.open(route)
         doc_length = len(doc)
         
-        # 2. Le pasamos el objeto 'doc' abierto a PyMuPDF4LLM
-        # Esto elimina la posibilidad de que PyMuPDF4LLM tenga problemas 
-        # al abrir el archivo por sí mismo.
-        data_chunks = pymupdf4llm.to_markdown(
-            doc=doc,
-            page_chunks=True
-        )
+        # 2. Extraer Markdown
+        data_chunks = pymupdf4llm.to_markdown(doc=doc, page_chunks=True)
         
-        # El resto del código para transformar el formato sigue igual...
         data = []
-        for chunk in data_chunks:
+        
+        # Usamos enumerate para tener un 'backup' del número de página
+        # 'index' empezará en 0, 1, 2...
+        for index, chunk in enumerate(data_chunks):
             clean_content = chunk['text'] 
             
             if clean_content:
-                # Aseguramos que los metadatos de PyMuPDF4LLM existan
+                # --- CORRECCIÓN DE PÁGINAS ---
+                # Intentamos leer el metadato de la librería
+                raw_page = chunk['metadata'].get('page')
+                
+                if raw_page is not None:
+                    # Si existe (ej: 0), le sumamos 1 -> Pág 1
+                    final_page = raw_page + 1
+                else:
+                    # Si la librería falló, usamos el índice del bucle -> Pág 1
+                    final_page = index + 1
+                
+                # Construimos el metadato corregido
                 metadata = {
-                    # PyMuPDF4LLM puede no incluir 'source' si le pasas el objeto abierto.
-                    # Usamos la 'route' original
                     "source": route, 
-                    "page": chunk['metadata'].get('page', 0),
-                    "total_pages": doc_length 
+                    "page": final_page, # <--- AQUÍ ESTÁ EL VALOR CORREGIDO (1, 2, 3...)
+                    "total_pages": doc_length,
+                    "document_id": document_id 
                 }
                 
                 data.append({
                     "page_content": clean_content,
                     "metadata": metadata
                 })
-        
-        # 3. Cerramos el documento
+                
+                # Debug para verificar que se arregló
+                if index == 0:
+                    print(f"✅ Página 1 corregida. Se guardará como: {final_page}")
+
         doc.close()
         return data
         
     except Exception as e:
-        print(f"Error al procesar el archivo con PyMuPDF4LLM: {e}")
-        # Asegurarse de cerrar el doc si se abrió antes del error
-        if doc:
-            doc.close()
+        print(f"❌ Error crítico en procesamiento PDF: {e}")
+        if doc: doc.close()
         return []
-     
+
+
+def extract_tables_from_page(file_path: str, page_num: int):
+    """
+    Usa pymupdf4llm para obtener el markdown de una página específica.
+    """
+    # Nota: page_num viene base 1 del usuario, PyMuPDF usa base 0
+    try:
+        # pymupdf4llm.to_markdown devuelve todo el texto formateado.
+        # Es excelente detectando tablas.
+        markdown_content = pymupdf4llm.to_markdown(
+            file_path, 
+            pages=[page_num - 1] 
+        )
+        return markdown_content
+    except Exception as e:
+        return f"Error leyendo página: {str(e)}"
 #verification
 '''
 ruta = "ejemplo.pdf"
